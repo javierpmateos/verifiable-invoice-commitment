@@ -7,6 +7,7 @@
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](./LICENSE)
 [![EIP: Draft](https://img.shields.io/badge/EIP-Draft-orange.svg)](./eip/eip-vic.md)
 [![Tests: 9/9](https://img.shields.io/badge/tests-9%2F9-brightgreen.svg)](./contracts/test/)
+[![CI](https://github.com/javierpmateos/verifiable-invoice-commitment/actions/workflows/ci.yml/badge.svg)](https://github.com/javierpmateos/verifiable-invoice-commitment/actions/workflows/ci.yml)
 
 ## What this is
 

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  solidity:
+    name: Solidity (forge build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Show Foundry version
+        run: forge --version
+
+      - name: Run forge build
+        working-directory: contracts
+        run: forge build --sizes
+
+      - name: Run forge test
+        working-directory: contracts
+        run: forge test -vv
+
+  typescript:
+    name: TypeScript (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: examples/typescript/package-lock.json
+
+      - name: Install dependencies
+        working-directory: examples/typescript
+        run: npm ci
+
+      - name: Type-check
+        working-directory: examples/typescript
+        run: npx tsc --noEmit
