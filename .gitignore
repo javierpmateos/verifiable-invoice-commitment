@@ -1,0 +1,25 @@
+# Node
+node_modules/
+dist/
+build/
+coverage/
+
+# TypeScript
+examples/typescript/dist/
+
+# Foundry
+out/
+cache/
+broadcast/
+contracts/lib/
+
+# Environment variables (NEVER commit)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS
+.DS_Store

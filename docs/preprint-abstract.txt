@@ -1,0 +1,53 @@
+Verifiable Invoice Commitment: An EVM-Native Standard for Committing Fiscal Metadata to On-Chain Payments
+
+Author: Javier Mateos
+Affiliation: Independent Researcher (Affiliated Collaborator, Tecnología Blockchain, Universidad Nacional de Mar del Plata)
+ORCID: 0009-0003-0596-1708
+Contact: javierpmateos@gmail.com
+
+Abstract:
+
+On-chain stablecoin payments have reached commercial scale, yet the
+accounting layer that traditionally accompanies a payment — the invoice,
+with its fiscal identifiers, tax breakdown, line items, and jurisdictional
+metadata — has no canonical representation in EVM ecosystems.
+Reconciliation between a transaction hash and the invoice it satisfies
+remains a private off-chain concern, fragmenting audit trails and
+preventing independent verification by tax authorities, auditors, and
+counterparties.
+
+This paper introduces Verifiable Invoice Commitment (VIC), a standard that
+binds structured invoice metadata to on-chain payments via three
+components: (i) a canonical EIP-712 typed-data schema covering fiscal
+identity, tax breakdown, foreign-exchange context, line items, and
+jurisdictional extensions; (ii) a singleton registrar contract
+deterministically deployable across EVM chains via CREATE2, with
+arbitrary-nonce replay protection and dual off-chain or encrypted-on-chain
+payload modes; and (iii) a companion ERC-7730 clear-signing descriptor for
+hardware-wallet verification.
+
+VIC composes with existing token contracts without modification, with
+account abstraction (ERC-4337), with permissioned-transfer hooks
+(ERC-7943), and with emerging agentic payment rails (Machine Payments
+Protocol, x402). Privacy is preserved by default: only the commitment hash
+and an optional URI are public; the invoice content lives off-chain or
+encrypted on-chain. The construction is GDPR-compatible in its default
+mode, since erasure of the off-chain document renders the on-chain
+commitment a hash without recoverable preimage.
+
+We position VIC against three classes of related work: prior ERC proposals
+(ERC-7699, ERC-7963, ERC-7943, EIP-965, ERC-1513), international
+frameworks (ITU-T F.751.4, W3C Commercial Invoice Verifiable Credential),
+and academic constructions (Fabrizio et al., 2019). To the author's
+knowledge, no existing standard or production system covers the
+composition VIC defines. A complete reference implementation in Solidity,
+an end-to-end TypeScript demonstration, and an ERC-7730 descriptor are
+publicly available under CC0 1.0.
+
+Keywords: blockchain, Ethereum, EIP-712, electronic invoicing, e-invoicing,
+fiscal metadata, ISO 20022, EVM standards, ERC, verifiable credentials,
+accounting, stablecoins, agentic commerce, GDPR, cryptographic commitment
+
+JEL Codes: G23, K34, M41, O33
+
+Repository: https://github.com/javierpmateos/verifiable-invoice-commitment

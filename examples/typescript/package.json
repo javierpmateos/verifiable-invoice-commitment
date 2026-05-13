@@ -1,0 +1,20 @@
+{
+  "name": "verifiable-invoice-commitment-example",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "End-to-end TypeScript demo for Verifiable Invoice Commitment (VIC)",
+  "scripts": {
+    "build": "tsc",
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

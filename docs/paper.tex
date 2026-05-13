@@ -1,0 +1,316 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{authblk}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  showstringspaces=false,
+  columns=fullflexible
+}
+
+\title{Verifiable Invoice Commitment: \\
+  An EVM-Native Standard for Committing Fiscal Metadata \\
+  to On-Chain Payments}
+
+\author{Javier Mateos}
+\affil{Independent Researcher \\
+  Affiliated Collaborator, Tecnología Blockchain \\
+  Universidad Nacional de Mar del Plata \\
+  ORCID: \href{https://orcid.org/0009-0003-0596-1708}{0009-0003-0596-1708} \\
+  \texttt{javierpmateos@gmail.com}}
+
+\date{April 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+On-chain stablecoin payments have reached commercial scale, yet the accounting layer that traditionally accompanies a payment --- the invoice, with its fiscal identifiers, tax breakdown, line items, and jurisdictional metadata --- has no canonical representation in EVM ecosystems. Reconciliation between a transaction hash and the invoice it satisfies remains a private off-chain concern, fragmenting audit trails and preventing independent verification by tax authorities, auditors, and counterparties.
+
+This paper introduces \emph{Verifiable Invoice Commitment} (VIC), a standard that binds structured invoice metadata to on-chain payments via three components: (i) a canonical EIP-712 typed-data schema covering fiscal identity, tax breakdown, foreign-exchange context, line items, and jurisdictional extensions; (ii) a singleton registrar contract deterministically deployable across EVM chains via CREATE2, with arbitrary-nonce replay protection and dual off-chain or encrypted-on-chain payload modes; and (iii) a companion ERC-7730 clear-signing descriptor for hardware-wallet verification.
+
+VIC composes with existing token contracts without modification, with account abstraction (ERC-4337), with permissioned-transfer hooks (ERC-7943), and with emerging agentic payment rails (MPP, x402). Privacy is preserved by default. We position VIC against prior ERC proposals, international frameworks, and academic constructions, and find no existing standard or production system that covers the composition VIC defines.
+\end{abstract}
+
+\noindent\textbf{Keywords:} blockchain, Ethereum, EIP-712, e-invoicing, fiscal metadata, ISO 20022, ERC, cryptographic commitment, GDPR.
+
+\section{Introduction}
+\label{sec:intro}
+
+The volume of stablecoin-denominated commercial payments on Ethereum-compatible chains has grown into the tens of billions of dollars annually. Bitso disclosed over USD 6.5 billion processed on the US--Mexico corridor during 2024. Stripe and Tempo launched the Machine Payments Protocol in March 2026 to standardize machine-to-machine commerce. Coinbase activated x402 as an HTTP-native payment rail. Chainlink integrated ISO 20022 messaging with SWIFT, DTCC, Euroclear, and other institutional counterparties throughout 2025.
+
+Despite this maturation of payment rails, no canonical mechanism exists in the Ethereum ecosystem for binding the accounting metadata of a commercial transaction --- the invoice --- to the on-chain payment that satisfies it. This paper proposes Verifiable Invoice Commitment (VIC) to fill that gap.
+
+\subsection{Contributions}
+
+\begin{enumerate}[leftmargin=*]
+  \item A canonical EIP-712 typed-data schema for commercial invoices on EVM, including fiscal identifiers in jurisdiction-specific formats, tax breakdown with basis-point precision, FX context aligned with Chainlink convention, and UN/CEFACT-aligned line items.
+  \item A singleton registrar contract design with deterministic CREATE2 deployment, arbitrary-nonce replay protection, and a dual payload mode (off-chain by default, encrypted on-chain opt-in).
+  \item An ERC-7730 clear-signing descriptor enabling hardware-wallet verification with human-readable rendering, including an analysis of which fields belong on-screen for the signing decision and which are auditor-only.
+  \item A complete reference implementation in Solidity 0.8.26 with a Foundry test suite, an end-to-end TypeScript demonstration with ethers.js v6, and gas-cost evaluation.
+  \item A formal positioning of VIC against existing ERCs, international standards bodies, and academic literature, with verification of each claimed precedent.
+\end{enumerate}
+
+\subsection{Organization}
+
+Section~\ref{sec:related} surveys related work across three categories: prior Ethereum standards, international frameworks, and academic constructions. Section~\ref{sec:design} presents the threat model, schema, and protocol. Section~\ref{sec:impl} describes the reference implementation. Section~\ref{sec:eval} evaluates gas cost, privacy properties, and GDPR compatibility. Section~\ref{sec:discussion} discusses composability, jurisdictional extension, and limitations. Section~\ref{sec:conclusion} concludes.
+
+\section{Background and Related Work}
+\label{sec:related}
+
+\subsection{Prior Ethereum proposals}
+
+\paragraph{ERC-7699 (Transfer Reference Extension).} Introduces a \texttt{bytes reference} field in transfers but explicitly leaves its semantic structure undefined, replicating the opacity of SWIFT MT103 field 70.
+
+\paragraph{ERC-7963 (Oracle-Permissioned ERC-20 with ZK-Verified ISO 20022).} Proposed by Ant International in May 2025. Specifies oracle-validated, ISO 20022-aligned payment instructions, but the payment instruction JSON lives off-chain and the schema targets institutional settlement, omitting tax breakdown, line items, and FX context.
+
+\paragraph{ERC-7943 (uRWA) and ERC-7972 (Universal Compliance Router).} Define compliance hooks for tokenized real-world assets without carrying accounting metadata.
+
+\paragraph{Bytes-data extensions.} ERC-223, ERC-677, ERC-777, ERC-1363 permit arbitrary payload attachment but standardize no semantics.
+
+\paragraph{Pre-transaction URIs.} EIP-681 and ERC-7856 define payment-request URIs whose metadata does not persist on-chain.
+
+\paragraph{LSP4 / LSP2 (LUKSO).} Provide flexible key-value metadata on tokens but define no canonical keys for fiscal identifiers or invoice line items.
+
+\paragraph{Earlier abandoned proposals.} EIP-965 (Šatkevič and Ressin, 2018) introduced a cheque pattern that paired a signed transfer authorization with a merchant invoice reference but used opaque bytes; never advanced beyond Draft. ERC-1513 (Tallyx, 2018) tokenized payment obligations as refungible NFTs for trade finance; addressed asset representation, not transfer-time metadata commitment.
+
+\subsection{International frameworks}
+
+\paragraph{ITU-T Recommendation F.751.4 (March 2022).} General framework for DLT-based invoices, including the lifecycle from issuance to tax clearance. Operates at the recommendation level and does not specify an EVM-native realization.
+
+\paragraph{W3C Traceability Vocabulary.} Defines a \texttt{CommercialInvoice} Verifiable Credential with linked-data semantics and DID-anchored issuers. Uses JSON-LD rather than EIP-712 and has no on-chain commitment mechanism.
+
+\paragraph{ISO 20022.} The dominant institutional payment messaging standard. Mappings to EVM exist via Chainlink ACE/CCIP and similar oracle-based approaches but bind only the settlement instruction, not the underlying commercial invoice.
+
+\paragraph{UN/CEFACT Cross-Industry Invoice (CII) and UBL.} Provide complete invoice schemas in XML. Reference points for VIC's line-item structure and unit codes; not directly compatible with EVM calldata constraints.
+
+\subsection{Academic constructions}
+
+\paragraph{Fabrizio et al. (2019).} A permissioned-blockchain invoice discounting system with attribute-based access control. Addresses a related problem (invoice factoring) on a different substrate (permissioned). VIC offers a public, cryptographic-economic alternative on EVM.
+
+\paragraph{Other relevant work.} Discussion of relevant work on commitment schemes, account abstraction, and stealth-address research as it pertains to VIC's privacy properties.
+
+\subsection{Production systems}
+
+\paragraph{Recibo (Circle, January 2026).} A smart-contract wrapper that allows encrypted messages to accompany USDC transfers. Defines the encryption envelope but no schema for the plaintext content.
+
+\paragraph{Request Network.} A proprietary multi-chain protocol for invoicing. Uses its own off-chain format; not an open standard at the ERC level.
+
+\paragraph{invoice.build.} A 2020--2023 invoice builder for DAI/USDC payments with off-chain SQL storage. Conceptually closest in spirit to VIC's default off-chain mode but without an EIP-712 schema or on-chain commitment.
+
+\paragraph{Tokenized invoice marketplaces.} Centrifuge, Polytrade, Defactor, and others tokenize invoices as financial assets for factoring. Related but distinct: their concern is asset representation, not transfer-time metadata commitment.
+
+\paragraph{Agentic payment rails.} MPP (Stripe/Tempo, March 2026), x402 (Coinbase). Standardize how an autonomous agent and a service negotiate a payment. Neither defines the accounting layer that accompanies the payment; VIC composes with both.
+
+\section{Design}
+\label{sec:design}
+
+\subsection{Threat model and goals}
+
+[This subsection should articulate what VIC defends against (e.g., counterparty repudiation of an invoice, tampering with line items after signing, replay across chains) and what it does not (e.g., legal correctness of tax classifications, off-chain availability of the JSON, post-quantum confidentiality of encrypted-on-chain payloads).]
+
+\subsection{Privacy goals}
+
+[Default off-chain mode: only the commitment hash and parties' addresses are public. Encrypted on-chain mode: content is sealed to the recipient's secp256k1 public key. Discussion of GDPR compatibility, especially Article 17 (right to erasure), and the analogy to dangling commitments without recoverable preimage.]
+
+\subsection{The Invoice typed-data schema}
+
+[Field-by-field justification of the schema as defined in the EIP. Particular attention to:
+\begin{itemize}
+  \item Why milli-units for fiat amounts (cross-currency uniform precision).
+  \item Why basis points for tax rates (regulator convention).
+  \item Why FX rate is scaled by $10^8$ (Chainlink alignment).
+  \item Why \texttt{regulatoryData} is opaque bytes (jurisdictional extensibility).
+  \item The structural invariant on line items and taxes.
+\end{itemize}]
+
+\subsection{The registrar contract}
+
+[Why a singleton (composability with stablecoins that will not adopt new transfer semantics). Why CREATE2 deterministic deployment (cross-chain address uniformity). Why arbitrary nonces (parallel issuance, lower volume disclosure). The dual payload mode and its trade-offs.]
+
+\subsection{Verification protocol}
+
+[The five-step verification procedure from Section 5 of the EIP, with particular attention to step 5 (payment-tx match), which is performed off-chain by walking Transfer event logs.]
+
+\section{Reference Implementation}
+\label{sec:impl}
+
+\subsection{Solidity contracts}
+
+[Description of the three contracts: \texttt{InvoiceCommitmentTypes} (shared structs), \texttt{InvoiceHasher} (EIP-712 struct hashing library, isolated for reuse), and \texttt{InvoiceCommitmentRegistry} (the singleton that combines them with OpenZeppelin's EIP712 and ECDSA primitives). Discussion of the \texttt{via\_ir} compiler flag necessitated by the 22-field encoding.]
+
+\subsection{Foundry test suite}
+
+[Coverage of the 9-test Foundry suite: happy paths for both payload modes, replay protection, signature failure, payload-mode invariants, third-party submission, nonce isolation, domain separator validity.]
+
+\subsection{ERC-7730 clear-signing descriptor}
+
+[The descriptor as a UX bridge between cryptographic correctness and human verification. Discussion of which fields lead the display (payment amount, recipient, invoice ID), which are middle-priority (FX context, fiscal identities, dates), and which are excluded from display but included in the hash (regulatoryData, fxOracle, nonce, internal indices).]
+
+\subsection{TypeScript end-to-end demonstration}
+
+[The demo walks an Argentine company billing 1,210 USD to a Mexican recipient with 21\% IVA, paying 1,210 mUSDC. The TypeScript implementation cross-checks its computed hash against the on-chain hash, ensuring no drift in the EIP-712 type encoding.]
+
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Gas cost}
+
+[Gas measurements from the test suite: ~135k gas for off-chain mode commitments, ~150k for encrypted with small payload. Comparison to baseline ERC-20 transfer (~50k). Cost in USD on L1 vs L2 at typical gas prices.]
+
+\subsection{Privacy properties}
+
+[Formal characterization of what an on-chain observer can learn (counterparty addresses, payment value via observable Transfer logs, approximate timing) versus what remains private (line items, prices, fiscal identifiers, FX context).]
+
+\subsection{GDPR compatibility}
+
+[Argument that off-chain-mode commitments satisfy Article 17 by way of erasure of the off-chain document rendering the on-chain hash a commitment without recoverable preimage. Discussion of why encrypted-on-chain mode is harder to defend under GDPR for natural persons' fiscal identifiers.]
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Composability with the modern ERC stack}
+
+[How VIC interfaces with EIP-3009 (\texttt{nonce} field), ERC-7699 (\texttt{reference} field), ERC-4337 (UserOperation bundling), ERC-7943 (RWA hooks), and MPP (Payment-Receipt header).]
+
+\subsection{Jurisdictional extension}
+
+[Sketch of companion ERCs for individual jurisdictions: Argentina (CAE), Mexico (UUID/PAC, RegimenFiscal, UsoCFDI), Italy (Codice Destinatario), India (GST e-Invoice IRN). Why opaque \texttt{regulatoryData} is the right level of abstraction for the core.]
+
+\subsection{Limitations}
+
+[Honest discussion of what VIC does not solve: legal validity of tax classifications, dispute resolution if recipient denies receiving the goods or services, off-chain document availability over time, key loss in encrypted-on-chain mode, eventual cryptographic obsolescence.]
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+[Summary of the contribution. Path forward: testnet deployments, jurisdictional extensions, integration with agentic payment rails, mainnet canonical deployment.]
+
+\section*{Reference Implementation Availability}
+
+The complete reference implementation, including the Solidity contracts, ERC-7730 descriptor, TypeScript end-to-end demonstration, and Foundry test suite, is publicly available under CC0 1.0 at \url{https://github.com/javierpmateos/verifiable-invoice-commitment}.
+
+\section*{Acknowledgments}
+
+This work was informed by community discussion of related ERCs, in particular ERC-7699, ERC-7963, ERC-7943, and ERC-7730. Multi-round literature review was conducted with independent verification of each claimed precedent across the EIP repositories, Ethereum Magicians forum, the W3C Traceability vocabulary, and the ITU-T DLT working group.
+
+\bibliographystyle{plainurl}
+\begin{thebibliography}{99}
+
+\bibitem{eip712}
+F. Vogelsteller and N. Mushegian.
+\newblock EIP-712: Ethereum typed structured data hashing and signing.
+\newblock Ethereum Improvement Proposal, 2017.
+
+\bibitem{eip3009}
+S. Daniel and P. Bao.
+\newblock EIP-3009: Transfer With Authorization.
+\newblock Ethereum Improvement Proposal, 2020.
+
+\bibitem{erc4337}
+V. Buterin et al.
+\newblock ERC-4337: Account Abstraction Using Alt Mempool.
+\newblock Ethereum Improvement Proposal, 2021.
+
+\bibitem{erc7699}
+R. Svarz.
+\newblock ERC-7699: ERC-20 Transfer Reference Extension.
+\newblock Ethereum Improvement Proposal (Draft), 2024.
+
+\bibitem{erc7730}
+L. Castillo.
+\newblock ERC-7730: Structured Data Clear Signing Format.
+\newblock Ethereum Improvement Proposal (Draft), 2024.
+
+\bibitem{erc7943}
+[Authors of uRWA].
+\newblock ERC-7943: Universal Real-World Asset Interface.
+\newblock Ethereum Improvement Proposal (Review), 2025.
+
+\bibitem{erc7963}
+Ant International.
+\newblock ERC-7963: Oracle-Permissioned ERC-20 with ZK-Verified ISO 20022 Payment Instructions.
+\newblock Ethereum Improvement Proposal (Draft), 2025.
+
+\bibitem{eip965}
+J. Šatkevič and A. Ressin.
+\newblock EIP-965: Authorize Operator by Cheque (ERC777 extension).
+\newblock Ethereum Improvement Proposal (Draft), 2018.
+
+\bibitem{erc1513}
+Tallyx.
+\newblock ERC-1513: Refungible Asset Standard for Global Trade.
+\newblock Ethereum Improvement Proposal (Draft), 2018.
+
+\bibitem{itu7514}
+International Telecommunication Union.
+\newblock ITU-T Recommendation F.751.4: General framework for distributed ledger technology (DLT)-based invoices.
+\newblock Geneva, March 2022.
+
+\bibitem{w3cinvoice}
+World Wide Web Consortium.
+\newblock Traceability Vocabulary --- Commercial Invoice credential.
+\newblock W3C Community Group Report.
+
+\bibitem{fabrizio2019}
+N. Fabrizio, E. Rossi, A. Martini, et al.
+\newblock Invoice Discounting: A Blockchain-Based Approach.
+\newblock \emph{Frontiers in Blockchain}, vol. 2, 2019.
+
+\bibitem{mpp}
+Stripe and Tempo.
+\newblock Machine Payments Protocol.
+\newblock March 2026.
+\newblock \url{https://stripe.com/blog/machine-payments-protocol}
+
+\bibitem{x402}
+Coinbase.
+\newblock x402: HTTP-native payments protocol.
+\newblock 2025.
+
+\bibitem{recibo}
+Circle.
+\newblock Recibo: Encrypted Receipts for USDC Transfers.
+\newblock January 2026.
+
+\bibitem{chainlinkace}
+Chainlink Labs.
+\newblock Automated Compliance Engine and Cross-Chain Interoperability Protocol.
+\newblock 2025.
+
+\bibitem{create2}
+V. Buterin.
+\newblock EIP-1014: Skinny CREATE2.
+\newblock Ethereum Improvement Proposal, 2018.
+
+\bibitem{iso20022}
+International Organization for Standardization.
+\newblock ISO 20022: Financial services --- Universal financial industry message scheme.
+
+\bibitem{uncefactcii}
+United Nations Centre for Trade Facilitation and Electronic Business.
+\newblock Cross-Industry Invoice (CII).
+\newblock UN/CEFACT.
+
+\end{thebibliography}
+
+\end{document}
