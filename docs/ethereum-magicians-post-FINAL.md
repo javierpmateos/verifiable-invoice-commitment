@@ -77,6 +77,11 @@ precedent I missed exists, I would value the correction.
 - **ERC-1513** (Tallyx, 2018, Draft, abandoned) tokenized payment
   obligations as refungible NFTs — a different problem (asset
   representation, not commitment of transfer-time metadata).
+- **ERC-7573** (Christian Fries, 2023, Draft) defines a cross-chain
+  Delivery-versus-Payment protocol using conditional-upon-transfer decryption.
+  It addresses a different problem (cross-chain DvP coordination, not fiscal
+  metadata commitment) but shares VIC's principle of binding off-chain
+  events to on-chain payments without trusted intermediaries.
 
 **Outside the EIP space:**
 
@@ -97,6 +102,10 @@ I welcome correction if a precedent I missed exists.
 VIC composes with, and does not replace:
 
 - **EIP-712**: foundation of the schema.
+- **EIP-5267**: future versions of the registrar SHOULD implement `eip712Domain()` 
+  to let off-chain signers resolve the domain separator without hardcoding the 
+  registrar address per chain. The current reference exposes `domainSeparator()`; 
+  EIP-5267 compliance is queued for v0.2.
 - **ERC-7730**: companion descriptor included in the repo.
 - **ERC-7699**: the `invoiceHash` MAY be placed in its `reference` field.
 - **EIP-3009**: the `invoiceHash` MAY serve as `nonce` for
