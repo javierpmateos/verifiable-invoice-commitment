@@ -37,9 +37,11 @@ VIC defines that binding cryptographically:
 4. A **companion ERC-7730 descriptor** so hardware wallets render the
    invoice in human-readable form at signing.
 
-Privacy is preserved by default. The construction is GDPR-compatible in
-off-chain mode: erasure of the off-chain document renders the on-chain
-hash a commitment without recoverable preimage.
+The default mode minimizes public disclosure: only the commitment hash
+and the parties' addresses appear on-chain. In off-chain mode, erasure of
+the off-chain invoice document renders the on-chain commitment a hash
+without recoverable preimage — a property intended to support
+GDPR-oriented data minimization and erasure workflows.
 
 The reference implementation is complete: 9/9 Foundry tests passing, an
 end-to-end TypeScript demo (Argentine company billing 1,210 USD to a
@@ -48,8 +50,9 @@ descriptor ready for submission to the Ledger registry. All under CC0.
 
 ## Why a new ERC
 
-I conducted a multi-round literature review with independent verification
-of each candidate. None of the existing standards covers the composition.
+I reviewed adjacent ERCs/EIPs, institutional frameworks, and production
+systems. None of the candidates I found covers the composition. If a
+precedent I missed exists, I would value the correction.
 
 **Adjacent ERCs and EIPs:**
 
@@ -138,14 +141,16 @@ storage on a public ledger that future cryptanalytic advances could
 break? I lean toward keeping it as opt-in with a Security
 Considerations warning, but I'm open to deprecating it.
 
-**Q5 — Naming.** "Verifiable Invoice Commitment" was chosen over
-"Invoice Anchor" because *anchor* is heavily overloaded in the space
-(Anchor Protocol on Terra/Luna with its 2022 collapse, Stellar's
+**Q5 — Whether the term "commitment" correctly communicates the
+cryptographic semantics to implementers.** The name was chosen because
+*commitment* is precise in cryptography (a binding, hiding scheme over a
+value), whereas *anchor* — the obvious alternative — is heavily
+overloaded in the space (Anchor Protocol on Terra/Luna, Stellar's
 "anchor" terminology for fiat gateways, Anchor as a fintech billing
-platform). *Commitment* is precise cryptographically: a binding,
-hiding scheme that commits to a value while optionally concealing it.
-I'd value pushback if the name is awkward in any context I haven't
-considered.
+platform). The risk is that "commitment" reads as abstract to
+implementers unfamiliar with commitment schemes, which is exactly the
+audience this standard targets (accounting teams, not cryptographers).
+Open to alternatives.
 
 ## What is in the repo today
 
@@ -163,15 +168,15 @@ considered.
   properties (signature validity, hash agreement, payment match,
   structural tax invariant).
 - Deterministic CREATE2 deployment script.
-- Cross-validation of off-chain hash against on-chain `hashInvoice` view
-  function — guarantees that no EIP-712 type drift exists between the
-  Solidity and TypeScript implementations.
+- Cross-validation of the off-chain hash against the on-chain
+  `hashInvoice` view function — verifies consistency between the
+  Solidity and TypeScript EIP-712 encodings.
 
 The reference registrar is deployed at the same canonical CREATE2 address on all three Sepolia testnets:
 
 **`0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD`**
 
-Source code is verified and publicly auditable:
+Source code is verified and available for inspection:
 
 - Sepolia (Etherscan): https://sepolia.etherscan.io/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code
 - Base Sepolia (Basescan): https://sepolia.basescan.org/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code
