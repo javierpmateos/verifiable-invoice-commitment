@@ -12,6 +12,11 @@ will move to `1.0.0` and breaking-change rules apply.
 
 ## [Unreleased]
 
+### Announced
+
+- 2026-05-13: Published on Ethereum Magicians for community discussion.
+  [Thread](https://ethereum-magicians.org/t/erc-verifiable-invoice-commitment-vic-fiscal-metadata-anchored-to-on-chain-payments-via-eip-712-singleton-registrar/28547).
+
 ### Planned
 
 - Reference deployments on Ethereum mainnet, Optimism, Polygon, Base, Arbitrum.

@@ -178,13 +178,19 @@ VIC composes with, and does not replace, existing standards:
 | Reference implementation (Solidity + tests)                  | ✓ Done       |
 | ERC-7730 clear-signing descriptor                            | ✓ Done       |
 | TypeScript end-to-end demo                                   | ✓ Done       |
-| Posted to Ethereum Magicians for discussion                  | Pending     |
+| Posted to Ethereum Magicians for discussion                  | ✓ Done      |
 | PR submitted to `ethereum/ERCs`                               | Pending     |
 | Reference deployment on Sepolia / Base Sepolia / Arbitrum    | ✓ Done      |
 | Preprint on SSRN                                             | Pending     |
 | ERC-7730 descriptor submitted to Ledger registry             | Pending     |
 | EIP advances to `Review`                                     | Pending     |
 | Mainnet canonical deployments                                | Pending     |
+
+Live discussion thread:
+https://ethereum-magicians.org/t/erc-verifiable-invoice-commitment-vic-fiscal-metadata-anchored-to-on-chain-payments-via-eip-712-singleton-registrar/28547
+
+Substantive design feedback is welcome on the thread. Implementation issues
+belong in this repository's Issues.
 
 ## Citing VIC
 
@@ -205,8 +211,10 @@ If you use VIC in academic work, please cite the preprint (when available):
 ## Contributing
 
 Issues and pull requests are welcome. Substantive design discussion happens
-on the Ethereum Magicians thread (link to be added once posted). For typos,
-code fixes, or clarifications, open a PR directly against this repository.
+on the [Ethereum Magicians thread][magicians]. For typos, code fixes, or
+clarifications, open a PR directly against this repository.
+
+[magicians]: https://ethereum-magicians.org/t/erc-verifiable-invoice-commitment-vic-fiscal-metadata-anchored-to-on-chain-payments-via-eip-712-singleton-registrar/28547
 
 ## Acknowledgments
 

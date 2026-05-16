@@ -3,7 +3,7 @@ eip: XXXX
 title: Verifiable Invoice Commitment (VIC)
 description: A standard for committing structured, EIP-712-signed invoice metadata to on-chain payments via a deterministic singleton registrar.
 author: Javier Mateos (@javierpmateos)
-discussions-to: https://ethereum-magicians.org/t/erc-vic
+discussions-to: https://ethereum-magicians.org/t/erc-verifiable-invoice-commitment-vic-fiscal-metadata-anchored-to-on-chain-payments-via-eip-712-singleton-registrar/28547
 status: Draft
 type: Standards Track
 category: ERC
