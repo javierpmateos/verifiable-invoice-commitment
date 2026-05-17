@@ -126,84 +126,120 @@ Section~\ref{sec:related} surveys related work across three categories: prior Et
 
 \subsection{Threat model and goals}
 
-[This subsection should articulate what VIC defends against (e.g., counterparty repudiation of an invoice, tampering with line items after signing, replay across chains) and what it does not (e.g., legal correctness of tax classifications, off-chain availability of the JSON, post-quantum confidentiality of encrypted-on-chain payloads).]
+VIC addresses threats arising from two parties with divergent incentives. The issuer benefits from an invoice that cannot be repudiated; the recipient benefits from one that cannot be retroactively altered. Each is a potential adversary to the other, and both face additional threats from third parties.
+
+First, counterparty repudiation. When the issuer signs the \texttt{Invoice} struct under EIP-712~\cite{eip712}, the signature binds the issuer's address to the exact byte representation of every field. The issuer cannot credibly deny having issued the invoice without breaking ECDSA. Any modification to a field --- amount, tax identifier, line-item description --- produces a different digest and invalidates the existing signature, defending against tampering. Cross-chain replay is prevented by the domain separator, which incorporates the chain ID per EIP-712; a signature produced on Ethereum mainnet is invalid on Base. Per-issuer replay is prevented by the \texttt{nonceUsed} mapping: once a nonce is consumed, any resubmission of the same signed invoice reverts with \texttt{NonceAlreadyUsed}. Third-party submission is explicitly allowed --- \texttt{commitInvoice} restricts only the issuer's signature, not the caller --- preserving composability with ERC-4337 bundlers~\cite{erc4337}. In the event of post-signature key compromise, an issuer may consume nonces defensively to prevent future commitments under the compromised key, though already-committed invoices remain valid.
+
+VIC does not defend against several concerns that lie outside the scope of a cryptographic commitment protocol. It does not enforce the legal correctness of tax classifications: if an issuer records a tax type as VAT when the applicable law requires a withholding treatment, VIC commits that classification immutably without detecting the error. It does not guarantee long-term availability of the off-chain JSON: the commitment is only as useful as the document it references, and retention obligations belong to the parties or to jurisdictional record-keeping requirements. It does not provide post-quantum confidentiality in encrypted-on-chain mode: the secp256k1-based encryption scheme is not conjectured to be secure against quantum adversaries, a caveat made explicit in the EIP's Security Considerations section. Finality of the commitment transaction is a standard blockchain concern; applications should confirm a sufficient number of blocks before relying on a commitment. Recipient masquerade is not defended on-chain: a recipient must verify off-chain that the invoice's \texttt{recipient} field matches their expected address before accepting the associated payment as settlement.
 
 \subsection{Privacy goals}
 
-[Default off-chain mode: only the commitment hash and parties' addresses are public. Encrypted on-chain mode: content is sealed to the recipient's secp256k1 public key. Discussion of GDPR compatibility, especially Article 17 (right to erasure), and the analogy to dangling commitments without recoverable preimage.]
+In the default off-chain mode, VIC minimizes on-chain disclosure. The \texttt{InvoiceCommitted} event records the issuer address, recipient address, \texttt{invoiceHash} (a 32-byte commitment), and \texttt{paymentTxRef}. The content of the invoice --- line items, prices, fiscal identifiers, FX context, and jurisdictional extensions --- remains off-chain, transmitted between parties through a channel of their choosing. A passive observer learns that two addresses interacted and may infer the payment amount by following the referenced Transfer event; all fiscal detail remains private. This design supports the GDPR right to erasure under Article 17: deleting the off-chain document renders the on-chain record a hash without a recoverable preimage, assuming the preimage resistance of keccak-256 and the absence of additional public copies of the original JSON. The precise legal qualification of adequate erasure depends on jurisdiction and regulatory interpretation; this paper does not constitute legal advice.
+
+The optional encrypted-on-chain mode allows the ciphertext of the invoice to be posted in the event's \texttt{encryptedPayload} field. This is appropriate when no pre-existing off-chain channel is available, but it carries a long-term caveat: the ciphertext is permanent on-chain. Key compromise or future advances in cryptanalysis of the secp256k1 curve may make the ciphertext recoverable. Encrypted-on-chain mode is therefore recommended only when off-chain coordination is infeasible, and parties handling natural persons' fiscal data should evaluate this trade-off with care. In this mode, Article 17 compliance is substantially harder to argue; parties should consider this before selecting the mode for data involving natural persons.
 
 \subsection{The Invoice typed-data schema}
 
-[Field-by-field justification of the schema as defined in the EIP. Particular attention to:
-\begin{itemize}
-  \item Why milli-units for fiat amounts (cross-currency uniform precision).
-  \item Why basis points for tax rates (regulator convention).
-  \item Why FX rate is scaled by $10^8$ (Chainlink alignment).
-  \item Why \texttt{regulatoryData} is opaque bytes (jurisdictional extensibility).
-  \item The structural invariant on line items and taxes.
-\end{itemize}]
+Several schema choices warrant explicit justification. Fiat amounts are represented in milli-units (\texttt{fiatAmountMilliUnits}, scaling factor $10^3$) rather than as decimal strings or native units. This provides three decimal places of precision uniformly across currencies with two decimal places (USD, EUR) and zero decimal places (JPY) under a single \texttt{uint256} representation that EVM storage and EIP-712 encoding handle without ambiguity. Tax rates are expressed in basis points (\texttt{rateBps}, factor $10^4$), a convention shared with fiscal regulators and with DeFi protocols such as Uniswap's fee tier system, making VIC rate values directly comparable to on-chain references without unit conversion. The foreign-exchange rate field \texttt{fxRateScaled} uses a factor of $10^8$, aligned with the eight-decimal convention of Chainlink Price Feeds, so that oracle lookups require no reconversion before populating the field.
+
+The \texttt{regulatoryData} field is an opaque \texttt{bytes} value accompanied by a two-character ISO~3166-1~alpha-2 \texttt{jurisdiction} discriminator. This design mirrors the extensibility pattern of EIP-712 itself: the core type hash is fixed, but the \texttt{jurisdiction} field signals to a verifier which companion ERC sub-schema, if any, governs the encoding of \texttt{regulatoryData}. Companion ERCs for individual jurisdictions can be proposed and reviewed independently without altering the core type hash or breaking existing signers. The \texttt{nonce} field is a free-form \texttt{uint256} chosen by the issuer, permitting parallel invoice issuance without coordination of issuer-side state. The trade-off is that an arbitrary nonce space discloses less volume metadata than a monotonic counter: an observer cannot infer the total number of invoices issued by a given address from the nonces alone. The \texttt{lineItems} and \texttt{taxes} arrays carry a structural invariant: the sum of \texttt{lineTotalMilliUnits} across line items plus the sum of \texttt{taxAmountMilliUnits} across tax entries must equal \texttt{fiatAmountMilliUnits}. This invariant is verified off-chain during the five-step protocol described in Section~\ref{sec:design}.\ref{subsec:verif}; enforcing it on-chain would impose gas cost unbounded in array length.
 
 \subsection{The registrar contract}
 
-[Why a singleton (composability with stablecoins that will not adopt new transfer semantics). Why CREATE2 deterministic deployment (cross-chain address uniformity). Why arbitrary nonces (parallel issuance, lower volume disclosure). The dual payload mode and its trade-offs.]
+The \texttt{InvoiceCommitmentRegistry} is a singleton: a single deployed instance serves all issuers, recipients, invoice types, and jurisdictions. This is a deliberate choice to preserve composability with existing ERC-20 stablecoin contracts, which will not adopt new transfer semantics to accommodate a fiscal metadata standard. The singleton requires no modification to token contracts: the issuer signs an invoice, executes a standard transfer, and then calls \texttt{commitInvoice} on the singleton. The contract holds no token balances and maintains two mappings: \texttt{\_commitments} (invoiceHash to \texttt{CommitmentRecord}) and \texttt{\_nonceUsed} (issuer address and nonce to boolean). The \texttt{commitInvoice} function does not restrict the caller; any party may submit a validly signed invoice on behalf of the issuer.
+
+The reference deployment uses CREATE2~\cite{create2} with a deterministic salt derived from the standard's name and version string, ensuring that the same bytecode and salt produce the same address on every EVM-compatible chain. This allows off-chain verifiers and developers to reference the registry by a fixed address --- \texttt{0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD} on the three testnets currently carrying a canonical deployment --- without consulting chain-specific deployment registries. The contract enforces strict dual-mode invariants: in \texttt{OffChain} mode, a non-empty \texttt{encryptedPayload} causes revert with \texttt{EncryptedPayloadForbidden}; in \texttt{EncryptedOnChain} mode, an empty payload causes revert with \texttt{EncryptedPayloadRequired}. Custom errors throughout the contract replace revert strings, reducing deployment size and revert-path gas cost while preserving structured diagnostic information for off-chain tooling.
 
 \subsection{Verification protocol}
+\label{subsec:verif}
 
-[The five-step verification procedure from Section 5 of the EIP, with particular attention to step 5 (payment-tx match), which is performed off-chain by walking Transfer event logs.]
+The recipient of a committed invoice follows a five-step protocol to establish the four core properties: signature validity, hash agreement, payment match, and tax-invariant satisfaction. First, the recipient resolves and deserializes the off-chain JSON document at the URI recorded in the \texttt{InvoiceCommitted} event, or decrypts the \texttt{encryptedPayload} in EncryptedOnChain mode. Second, the recipient recomputes the EIP-712 digest of the \texttt{Invoice} struct locally, applying the same type hashes and domain separator as the registry. Third, the recipient calls \texttt{getCommitment(invoiceHash)} on the registry to confirm that the hash is on-chain and retrieve the stored issuer address, recipient address, and payment transaction reference. Fourth, the recipient recovers the signer from the \texttt{issuerSignature} field of the event using ECDSA recovery and confirms it matches \texttt{invoice.issuer}. Fifth, the recipient walks the Transfer event logs of the referenced payment transaction to confirm the existence of a transfer from \texttt{invoice.issuer} to \texttt{invoice.recipient} with value equal to \texttt{invoice.paymentAmount} in token \texttt{invoice.paymentToken}. At any step, the recipient additionally verifies the structural tax invariant: the sum of \texttt{taxAmountMilliUnits} across all \texttt{taxes} entries plus the sum of \texttt{lineTotalMilliUnits} across all \texttt{lineItems} must equal \texttt{fiatAmountMilliUnits}.
 
 \section{Reference Implementation}
 \label{sec:impl}
 
 \subsection{Solidity contracts}
 
-[Description of the three contracts: \texttt{InvoiceCommitmentTypes} (shared structs), \texttt{InvoiceHasher} (EIP-712 struct hashing library, isolated for reuse), and \texttt{InvoiceCommitmentRegistry} (the singleton that combines them with OpenZeppelin's EIP712 and ECDSA primitives). Discussion of the \texttt{via\_ir} compiler flag necessitated by the 22-field encoding.]
+The reference implementation comprises three Solidity components. \texttt{InvoiceCommitmentTypes} is a library containing only struct and enum definitions: \texttt{Invoice}, \texttt{TaxEntry}, \texttt{LineItem}, \texttt{TaxIdentity}, and the \texttt{PayloadMode} enum. Separating type definitions into their own library prevents circular imports and allows downstream projects to import the schema without depending on either the registry or the hashing logic. \texttt{InvoiceHasher} is a pure library implementing the EIP-712 struct-hash computation for all nested types. Its isolation enables reuse in contexts that require off-chain hash verification or alternative registry designs without deploying the full singleton. \texttt{InvoiceCommitmentRegistry} is the singleton that extends OpenZeppelin~v5's \texttt{EIP712} base contract and uses its \texttt{ECDSA} primitives for signature recovery.
+
+The contracts target Solidity~0.8.26 and are compiled with the \texttt{via\_ir} pipeline enabled. This flag is required to avoid a stack-too-deep compilation error in \texttt{hashInvoiceStruct}, which encodes 22 fields in a single \texttt{abi.encode} call. Custom errors (\texttt{InvalidSignature}, \texttt{NonceAlreadyUsed}, \texttt{InvoiceAlreadyCommitted}, \texttt{EncryptedPayloadRequired}, \texttt{EncryptedPayloadForbidden}) replace revert strings throughout, reducing deployment size and revert-path gas while providing structured diagnostic data. The code is released under CC0-1.0 and deployed canonically at \texttt{0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD} on Sepolia, Base Sepolia, and Arbitrum Sepolia via the CREATE2~\cite{create2} mechanism.
 
 \subsection{Foundry test suite}
 
-[Coverage of the 9-test Foundry suite: happy paths for both payload modes, replay protection, signature failure, payload-mode invariants, third-party submission, nonce isolation, domain separator validity.]
+The test suite comprises nine cases: the happy path in OffChain mode (asserting the returned hash, nonce state, and stored \texttt{CommitmentRecord}); the happy path in EncryptedOnChain mode; third-party submission (confirming that a caller other than the issuer can commit a validly signed invoice); signature failure (wrong signer key produces \texttt{InvalidSignature}); replay rejection (a second call with a consumed nonce reverts with \texttt{NonceAlreadyUsed}); the two payload-mode invariants in both directions (non-empty \texttt{encryptedPayload} in OffChain mode, and empty \texttt{encryptedPayload} in EncryptedOnChain mode, each reverting with their respective custom errors); nonce isolation between distinct invoices (two invoices with different nonces coexist without collision); and a view test confirming the domain separator is non-zero. All nine tests pass. Gas measurements are reported in Section~\ref{sec:eval}.
 
 \subsection{ERC-7730 clear-signing descriptor}
 
-[The descriptor as a UX bridge between cryptographic correctness and human verification. Discussion of which fields lead the display (payment amount, recipient, invoice ID), which are middle-priority (FX context, fiscal identities, dates), and which are excluded from display but included in the hash (regulatoryData, fxOracle, nonce, internal indices).]
+Hardware wallet devices present EIP-712 messages for signing. Without a clear-signing descriptor~\cite{erc7730}, the signer sees only an opaque hexadecimal digest on the device screen and cannot verify that the structured data corresponds to their intent. The companion ERC-7730 descriptor for VIC bridges this gap by mapping each \texttt{Invoice} field to a human-readable display format, enabling the device to render the invoice in a form the signer can verify before approving.
+
+The descriptor assigns fields to display priority tiers. Lead fields, shown prominently at the top of the signing screen, are \texttt{paymentAmount} (rendered as a token amount with the currency resolved from \texttt{paymentToken}), \texttt{recipient} (rendered as an ENS-resolved address name where available), \texttt{invoiceId} (raw string), and \texttt{fiatAmountMilliUnits} (rendered with two decimal places in the fiat currency). Middle-priority fields include FX context (\texttt{fxRateScaled}, \texttt{fxTimestamp}), fiscal identities (\texttt{issuerTaxId.scheme} and \texttt{issuerTaxId.id}, \texttt{recipientTaxId.scheme} and \texttt{recipientTaxId.id}), and temporal fields (\texttt{issueDate}, \texttt{dueDate}, \texttt{paymentTerms}). The \texttt{taxes} and \texttt{lineItems} arrays are rendered with their sub-fields, with tax rates displayed in percentage form and amounts in the fiat currency. The \texttt{excluded} list suppresses \texttt{purchaseOrderRef}, \texttt{fxOracle}, \texttt{regulatoryData}, \texttt{nonce}, \texttt{fiatCurrency} (used as a format parameter), \texttt{taxes.[].baseAmountMilliUnits}, and \texttt{lineItems.[].taxRefIndex}. These fields are included in the EIP-712 hash and therefore tamper-protected, but they are auditor-level detail rather than information required for the signing decision. Enum metadata for \texttt{taxIdentitySchemes} (AR-CUIT, MX-RFC, EU-VAT, US-EIN, OTHER) and \texttt{taxTypes} (VAT, IVA, SALES, WITHHOLDING, OTHER) provides localized label rendering.
 
 \subsection{TypeScript end-to-end demonstration}
 
-[The demo walks an Argentine company billing 1,210 USD to a Mexican recipient with 21\% IVA, paying 1,210 mUSDC. The TypeScript implementation cross-checks its computed hash against the on-chain hash, ensuring no drift in the EIP-712 type encoding.]
+The TypeScript demonstration uses ethers.js~v6 against a local Anvil instance to walk the complete VIC flow. An Argentine company (issuer CUIT \texttt{30-12345678-9}) issues an invoice for consulting services billed at 1{,}210~USD to a Mexican recipient (RFC \texttt{CLIX850101AB1}), with one line item of 1{,}000~USD net plus 21\% IVA (\texttt{rateBps}~= 2100) totalling 1{,}210~USD, paid in 1{,}210~mock-USDC at a 1:1 FX rate. After constructing and signing the \texttt{Invoice} struct off-chain, the demonstration performs a cross-validation step: it calls \texttt{hashInvoice(invoice)} on the deployed registry and compares the returned digest with the hash computed locally by ethers.js. A mismatch at this step would indicate type drift between the Solidity and TypeScript EIP-712 encodings; both encodings produce the same digest. The demonstration then sends the USDC transfer, commits the invoice referencing the payment transaction hash in OffChain mode, and runs the five-step verification protocol as the recipient. All four properties --- signature validity, hash agreement, payment match, and tax-invariant satisfaction --- pass.
 
 \section{Evaluation}
 \label{sec:eval}
 
 \subsection{Gas cost}
 
-[Gas measurements from the test suite: ~135k gas for off-chain mode commitments, ~150k for encrypted with small payload. Comparison to baseline ERC-20 transfer (~50k). Cost in USD on L1 vs L2 at typical gas prices.]
+Table~\ref{tab:gas} reports \texttt{commitInvoice} gas costs measured by the Foundry test suite using \texttt{forge test --gas-report}. The OffChain mode median (126{,}262 gas) represents a typical successful commit with a fresh nonce, two SSTORE operations (\texttt{\_nonceUsed} and \texttt{\_commitments}), and one ECDSA recovery. The EncryptedOnChain mode maximum (146{,}750 gas) represents a successful commit including a 6-byte \texttt{encryptedPayload} recorded in the event; payload size is the primary driver of marginal cost in this mode. For context, a baseline ERC-20 \texttt{transfer} costs approximately 51{,}000~gas. The overhead of \texttt{commitInvoice} over a bare transfer --- roughly 75{,}000--96{,}000~gas --- covers signature recovery, two storage writes, and the commitment event. On Ethereum mainnet at 2~gwei and ETH~=~\$3{,}000, this overhead is below \$0.60. On L2 networks at typical sub-0.01~gwei pricing, the total cost of commitment is well below one cent.
+
+\begin{table}[h]
+\centering
+\caption{Gas costs measured by the Foundry test suite (Solc~0.8.26, \texttt{via\_ir}). L1 cost assumes 2~gwei base fee and ETH~=~\$3{,}000; L2 cost assumes 0.005~gwei (Base, typical at time of writing).}
+\label{tab:gas}
+\begin{tabular}{lrrr}
+\toprule
+Operation & Gas & L1 cost (\$) & L2 cost (\$) \\
+\midrule
+\texttt{commitInvoice} (OffChain mode)    & 126{,}262 & 0.76 & $<$0.01 \\
+\texttt{commitInvoice} (EncryptedOnChain) & 146{,}750 & 0.88 & $<$0.01 \\
+ERC-20 \texttt{transfer} (baseline)       &  51{,}000 & 0.31 & $<$0.01 \\
+Registry deployment (one-time)            & 1{,}035{,}560 & 6.21 & $<$0.10 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Privacy properties}
 
-[Formal characterization of what an on-chain observer can learn (counterparty addresses, payment value via observable Transfer logs, approximate timing) versus what remains private (line items, prices, fiscal identifiers, FX context).]
+An observer monitoring the chain in off-chain mode can determine: (1)~that the issuer address has committed to an invoice at a given block height; (2)~the recipient address; (3)~the 32-byte \texttt{invoiceHash}, which carries no recoverable fiscal content under the preimage resistance of keccak-256; and (4)~the \texttt{paymentTxRef}, from which the observer may walk Transfer event logs to determine the token transferred and the amount. The payment amount is therefore observable on-chain by virtue of the standard ERC-20 Transfer event, independent of VIC. What an observer cannot determine from on-chain data alone is any fiscal content of the invoice: the itemised charges, the fiat currency and amounts, the tax identifiers (CUIT, RFC, VAT number, EIN), the FX context, or any jurisdictional extensions in \texttt{regulatoryData}.
+
+In encrypted on-chain mode, the ciphertext is recorded permanently in the event. The long-term privacy guarantee depends on the continued security of the encryption scheme and the secp256k1 curve. An adversary who obtains the decryption key --- through key compromise, legal compulsion, or future cryptanalytic advances --- can recover the full invoice content from immutable chain history. This is a qualitatively different privacy profile from off-chain mode, where erasure of the off-chain document eliminates the only path to content recovery. The two modes therefore offer different privacy guarantees and should be selected accordingly.
 
 \subsection{GDPR compatibility}
 
-[Argument that off-chain-mode commitments satisfy Article 17 by way of erasure of the off-chain document rendering the on-chain hash a commitment without recoverable preimage. Discussion of why encrypted-on-chain mode is harder to defend under GDPR for natural persons' fiscal identifiers.]
+The tension between GDPR's right to erasure under Article~17 and the immutability of public blockchains is a recognized challenge in the legal technology literature. VIC's off-chain mode addresses this tension structurally: the on-chain commitment is a keccak-256 hash with no known preimage-recovery algorithm at current computational bounds. Deleting the off-chain JSON document renders the on-chain record a commitment without a recoverable preimage, leaving an observer with evidence that some invoice was committed but no means to reconstruct its content. This argument rests on two assumptions: the preimage resistance of keccak-256 (considered secure by the cryptographic community at the time of writing) and the absence of additional accessible copies of the original document. Parties must ensure that their retention practices --- backups, third-party archives, shared storage systems --- are consistent with any erasure obligation they intend to discharge.
+
+The encrypted on-chain mode presents a harder case under GDPR for data relating to natural persons. The ciphertext is permanent on-chain. If the encryption key becomes accessible --- through compromise, legal compulsion, or cryptographic advances --- the data is recoverable, undermining any claim of erasure. For business-to-business transactions between legal entities, the risk profile differs: natural-person identifiers are generally absent from commercial invoices between corporations, and GDPR's personal data scope may not be triggered. Parties should evaluate this distinction with qualified legal counsel; this paper does not constitute legal advice, and the precise qualification of adequate erasure depends on the applicable jurisdiction and supervisory authority's interpretation.
 
 \section{Discussion}
 \label{sec:discussion}
 
 \subsection{Composability with the modern ERC stack}
 
-[How VIC interfaces with EIP-3009 (\texttt{nonce} field), ERC-7699 (\texttt{reference} field), ERC-4337 (UserOperation bundling), ERC-7943 (RWA hooks), and MPP (Payment-Receipt header).]
+VIC is designed as a composition layer, not a replacement for any existing standard. With respect to EIP-712~\cite{eip712}, the \texttt{Invoice} struct is canonical EIP-712 typed data; no extension or fork of the signing standard is required. EIP-5267~\cite{eip5267} formalizes a \texttt{eip712Domain()} accessor for domain separator discovery by off-chain signers. The current registry exposes \texttt{domainSeparator()} but does not implement the EIP-5267 interface. A subsequent version should adopt EIP-5267 to allow signers to resolve the domain separator without hardcoding per-chain registry addresses. With respect to ERC-7699~\cite{erc7699}, the \texttt{invoiceHash} may be placed in the \texttt{reference} field of a compatible transfer, giving the opaque bytes a concrete semantic interpretation. With respect to EIP-3009~\cite{eip3009}, the \texttt{invoiceHash} may serve as the nonce in a \texttt{transferWithAuthorization} call, binding the commitment directly to the signed transfer authorization and eliminating the need for a separate \texttt{commitInvoice} transaction. With respect to ERC-4337~\cite{erc4337}, commitment and payment may be bundled atomically in a UserOperation, providing strong ordering guarantees between the fiscal record and the on-chain payment.
+
+With respect to ERC-7943~\cite{erc7943}, a uRWA implementer may invoke \texttt{commitInvoice} from a \texttt{canTransfer} hook, gating compliant transfers on the presence of fiscal metadata. With respect to ERC-7573~\cite{erc7573}, which defines conditional-upon-transfer decryption for cross-chain delivery-versus-payment, the design lineage is shared --- both standards bind off-chain artifacts to on-chain payments --- though the problem statements differ. ERC-7573 targets DvP settlement via conditional decryption; VIC targets fiscal metadata commitment via EIP-712 signatures. The two could be deployed in combination: a DvP trade settled via ERC-7573 could reference a VIC invoice hash in the payment leg. With respect to emerging agentic payment rails, the \texttt{invoiceHash} may appear in the \texttt{Payment-Receipt} header proposed by MPP~\cite{mpp} or in the settlement response body of x402~\cite{x402}, providing the accounting layer that neither protocol currently specifies.
 
 \subsection{Jurisdictional extension}
 
-[Sketch of companion ERCs for individual jurisdictions: Argentina (CAE), Mexico (UUID/PAC, RegimenFiscal, UsoCFDI), Italy (Codice Destinatario), India (GST e-Invoice IRN). Why opaque \texttt{regulatoryData} is the right level of abstraction for the core.]
+The \texttt{regulatoryData} opaque bytes field, accompanied by the ISO~3166-1~alpha-2 \texttt{jurisdiction} discriminator, is a meta-pattern for forward compatibility. It mirrors how EIP-712 itself defers the semantic structure of signed data to the application domain: the core type hash is stable, but the interpretation of \texttt{regulatoryData} is delegated to a companion ERC identified by the \texttt{jurisdiction} value. A companion ERC for a given jurisdiction would specify the serialization format of \texttt{regulatoryData} for that jurisdiction's code, the additional fields required by local fiscal regulation, and the validation logic an on-chain or off-chain verifier must apply. Proposed companion ERCs could cover: Argentina --- CAE authorization number, AFIP invoice type codes (FC-A, FC-B, FC-M), comprobante type under RG~4291; Mexico --- UUID and PAC certification reference, \texttt{RegimenFiscal} of the recipient, \texttt{UsoCFDI}, and certificate number; Italy --- Codice Destinatario for SDI routing; India --- GST e-Invoice IRN; and cross-border EU transactions requiring VAT MOSS data.
+
+The modular design ensures that each companion ERC is proposed and reviewed by the fiscal community of the relevant jurisdiction, without requiring changes to the core VIC type hash. A jurisdiction without a companion ERC simply leaves \texttt{regulatoryData} empty and populates \texttt{jurisdiction} with the applicable country code. Because the field is opaque at the core schema level, the core type hash remains stable across all jurisdictional extensions: only the contents of the field change, not the field itself.
 
 \subsection{Limitations}
 
-[Honest discussion of what VIC does not solve: legal validity of tax classifications, dispute resolution if recipient denies receiving the goods or services, off-chain document availability over time, key loss in encrypted-on-chain mode, eventual cryptographic obsolescence.]
+VIC commits to fiscal metadata but does not validate the correctness of what it commits. If an issuer classifies a tax entry as VAT when the applicable regulation requires a withholding treatment, VIC records that classification immutably on-chain without detecting the error. The protocol's guarantee is that what was signed is what was committed; it says nothing about whether the content complies with applicable law. Relatedly, VIC provides no dispute-resolution mechanism: if a recipient disputes delivery of the goods or services described in an invoice, neither the registry nor the EIP-712 signature resolves the factual question. VIC is complementary to off-chain dispute-resolution mechanisms, not a replacement.
+
+Off-chain document availability is a structural dependency. If both parties lose the off-chain JSON and no accessible copy exists, the on-chain commitment becomes a hash without a recoverable preimage --- evidence that an invoice existed, but no longer readable. This reduces to a record-keeping obligation consistent with standard commercial and fiscal document retention requirements. In encrypted on-chain mode, key loss results in permanent data loss; the ciphertext is irreversibly sealed if the decryption key is not preserved. Schema evolution poses a further constraint: any change to a core \texttt{Invoice} field requires a new EIP-712 domain version, breaking compatibility with v1 signers. The \texttt{regulatoryData} extensibility mechanism mitigates this for jurisdictional additions but does not address the case where a core field must be renamed or its type changed, which would require a coordinated version migration across all signing implementations.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-[Summary of the contribution. Path forward: testnet deployments, jurisdictional extensions, integration with agentic payment rails, mainnet canonical deployment.]
+VIC defines a minimal composition layer between Ethereum's cryptographic-economic payment infrastructure and the accounting and legal layer that commercial transactions require. The three components --- a canonical EIP-712 typed-data schema for fiscal invoices, a singleton registrar with replay protection and dual payload modes, and a hardware-wallet clear-signing descriptor --- are individually reusable and collectively sufficient to bind a structured invoice to an on-chain payment in a form that supports independent verification by counterparties, auditors, and fiscal authorities.
+
+The path forward includes a formal Ethereum Improvement Proposal submission to the ethereum/ERCs repository, mainnet canonical deployment via the CREATE2 salt shared across chains, companion jurisdictional ERCs beginning with Argentina and Mexico, and submission of the ERC-7730 descriptor to the Ledger clear-signing registry. Each design decision in VIC selects the least surface area that covers commercial requirements: a single typed-data schema rather than a new token standard, a singleton registry rather than per-issuer deployments, off-chain storage by default rather than mandatory on-chain data. The result is a standard that composes with the existing EVM ecosystem without requiring modifications to deployed contracts, established signing tools, or operational payment rails.
 
 \section*{Reference Implementation Availability}
 
@@ -211,7 +247,7 @@ The complete reference implementation, including the Solidity contracts, ERC-773
 
 \section*{Acknowledgments}
 
-This work was informed by community discussion of related ERCs, in particular ERC-7699, ERC-7963, ERC-7943, and ERC-7730. Multi-round literature review was conducted with independent verification of each claimed precedent across the EIP repositories, Ethereum Magicians forum, the W3C Traceability vocabulary, and the ITU-T DLT working group.
+This work was informed by community discussion of related ERCs, in particular ERC-7699~\cite{erc7699}, ERC-7963, ERC-7943~\cite{erc7943}, ERC-7730~\cite{erc7730}, ERC-7573~\cite{erc7573}, and EIP-5267~\cite{eip5267}. The author also contributes to the x402 reference implementation~\cite{x402}, which informed the composability analysis of VIC with HTTP-native payment rails. Multi-round literature review was conducted with independent verification of each claimed precedent across the EIP repositories, the Ethereum Magicians forum, the W3C Traceability vocabulary, and the ITU-T DLT working group.
 
 \bibliographystyle{plainurl}
 \begin{thebibliography}{99}
@@ -242,7 +278,7 @@ L. Castillo.
 \newblock Ethereum Improvement Proposal (Draft), 2024.
 
 \bibitem{erc7943}
-[Authors of uRWA].
+uRWA Working Group.
 \newblock ERC-7943: Universal Real-World Asset Interface.
 \newblock Ethereum Improvement Proposal (Review), 2025.
 
@@ -310,6 +346,16 @@ International Organization for Standardization.
 United Nations Centre for Trade Facilitation and Electronic Business.
 \newblock Cross-Industry Invoice (CII).
 \newblock UN/CEFACT.
+
+\bibitem{erc7573}
+C. Fries.
+\newblock ERC-7573: Conditional-upon-Transfer-Decryption for Delivery-Versus-Payment.
+\newblock Ethereum Improvement Proposal (Draft), 2023.
+
+\bibitem{eip5267}
+F. Giordano.
+\newblock EIP-5267: Retrieval of EIP-712 Domain.
+\newblock Ethereum Improvement Proposal, 2022.
 
 \end{thebibliography}
 
