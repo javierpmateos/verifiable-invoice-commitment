@@ -48,7 +48,7 @@ On-chain stablecoin payments have reached commercial scale, yet the accounting l
 
 This paper introduces \emph{Verifiable Invoice Commitment} (VIC), a standard that binds structured invoice metadata to on-chain payments via three components: (i) a canonical EIP-712 typed-data schema covering fiscal identity, tax breakdown, foreign-exchange context, line items, and jurisdictional extensions; (ii) a singleton registrar contract deterministically deployable across EVM chains via CREATE2, with arbitrary-nonce replay protection and dual off-chain or encrypted-on-chain payload modes; and (iii) a companion ERC-7730 clear-signing descriptor for hardware-wallet verification.
 
-VIC composes with existing token contracts without modification, with account abstraction (ERC-4337), with permissioned-transfer hooks (ERC-7943), and with emerging agentic payment rails (MPP, x402). Privacy is preserved by default. We position VIC against prior ERC proposals, international frameworks, and academic constructions, and find no existing standard or production system that covers the composition VIC defines.
+VIC composes with existing token contracts without modification, with account abstraction (ERC-4337), with permissioned-transfer hooks (ERC-7943), and with emerging agentic payment rails (MPP, x402). Privacy is preserved by default. We position VIC against prior ERC proposals, international frameworks, and academic constructions; to the best of the author's literature review, no existing standard or production system covers the composition VIC defines, and the related-work survey welcomes correction.
 \end{abstract}
 
 \noindent\textbf{Keywords:} blockchain, Ethereum, EIP-712, e-invoicing, fiscal metadata, ISO 20022, ERC, cryptographic commitment, GDPR.
@@ -121,8 +121,81 @@ Section~\ref{sec:related} surveys related work across three categories: prior Et
 
 \paragraph{Agentic payment rails.} MPP (Stripe/Tempo, March 2026), x402 (Coinbase). Standardize how an autonomous agent and a service negotiate a payment. Neither defines the accounting layer that accompanies the payment; VIC composes with both.
 
+\subsection{Summary of related work}
+
+Table~\ref{tab:related} summarizes the prior art surveyed in this section, distinguishing among standards-track proposals (ERCs, EIPs, ISO, ITU, W3C), institutional implementations not aimed at canonical standardization, and academic constructions on alternative substrates.
+
+\begin{table}[h]
+\centering
+\caption{Related work classified by type and status. Scope columns indicate whether each artifact addresses the composition VIC defines.}
+\label{tab:related}
+\small
+\begin{tabular}{lllll}
+\toprule
+Artifact & Type & Status & Schema for invoice & EVM-native commitment \\
+\midrule
+ERC-7699          & ERC          & Draft        & Opaque         & Partial \\
+ERC-7963          & ERC          & Draft        & ISO 20022 inst. & No \\
+ERC-7943          & ERC          & Review       & N/A            & N/A \\
+ERC-7573          & ERC          & Draft        & N/A            & Partial \\
+EIP-3009          & EIP          & Final        & N/A            & No \\
+EIP-5267          & EIP          & Final        & N/A            & No \\
+EIP-965           & EIP          & Abandoned    & Opaque         & Partial \\
+ERC-1513          & ERC          & Abandoned    & Asset model    & N/A \\
+ITU-T F.751.4     & ITU-T Rec.   & Approved     & General DLT    & No \\
+W3C Commercial VC & W3C Group    & Note         & JSON-LD        & No \\
+Recibo            & Product      & Production   & None canonical & Partial \\
+Request Network   & Product      & Production   & Proprietary    & Partial \\
+Fabrizio et al.   & Academic     & Published    & XML/permissioned & No \\
+\textbf{VIC}      & ERC          & Proposed     & EIP-712 typed  & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The columns distinguish what each artifact contributes: \emph{Schema for invoice}
+indicates whether the artifact defines structured fiscal metadata (line items, taxes,
+fiscal identities) versus opaque references or none; \emph{EVM-native commitment}
+indicates whether the artifact binds metadata to an on-chain payment via an EVM
+contract. ``Partial'' indicates a mechanism that could carry such a commitment but
+without a canonical schema. Among standards-track proposals, ERC-7699 is the closest
+adjacent work: it defines a transfer reference field but explicitly leaves its
+semantics undefined, which VIC's \texttt{invoiceHash} can populate.
+
 \section{Design}
 \label{sec:design}
+
+\subsection{Scope: normative versus informative content}
+\label{subsec:scope}
+
+VIC's content falls into three layers with distinct normative weight, which this
+paper makes explicit to support reviewers in scoping the standard.
+
+First, the \emph{normative} core specifies what implementers MUST follow to claim
+VIC compliance: the EIP-712 typed-data schema for the \texttt{Invoice} struct
+(including field names, types, and order), the registrar interface
+(\texttt{commitInvoice}, \texttt{getCommitment}, \texttt{isNonceUsed},
+\texttt{hashInvoice}, \texttt{domainSeparator}), the event signature
+(\texttt{InvoiceCommitted}), the custom error semantics, the dual payload-mode
+invariants, and the structural tax invariant verified off-chain.
+
+Second, the \emph{informative} reference implementation describes how the authors
+chose to deploy VIC and MAY be adapted: the CREATE2 salt
+(\texttt{keccak256("ERC-XXXX.VerifiableInvoiceCommitment.v1")}), the canonical
+testnet address derived from that salt, the Solidity~0.8.26 compilation settings
+with \texttt{via\_ir}, the use of OpenZeppelin~v5's \texttt{EIP712} and
+\texttt{ECDSA} libraries, and the demo's MockERC20 token. These are reproducibility
+choices, not normative requirements.
+
+Third, the \emph{UX layer} defined by the companion ERC-7730 descriptor governs how
+hardware wallets render the \texttt{Invoice} struct for signing. The descriptor's
+field priority assignments, the use of ENS resolution for the recipient address,
+and the localized enum labels are interface conventions whose precise rendering
+depends on the wallet vendor. They are not normatively required by VIC itself but
+are recommended for a clear-signing user experience.
+
+Companion ERCs MAY normatively specify the format of \texttt{regulatoryData} for a
+given ISO 3166-1 alpha-2 \texttt{jurisdiction} value. Such companion standards
+extend VIC without modifying its core type hash.
 
 \subsection{Threat model and goals}
 
