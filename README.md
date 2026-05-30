@@ -9,6 +9,13 @@
 [![Tests: 9/9](https://img.shields.io/badge/tests-9%2F9-brightgreen.svg)](./contracts/test/)
 [![CI](https://github.com/javierpmateos/verifiable-invoice-commitment/actions/workflows/ci.yml/badge.svg)](https://github.com/javierpmateos/verifiable-invoice-commitment/actions/workflows/ci.yml)
 
+## Academic Paper
+
+A preprint of this work is published at SSRN:
+
+**Mateos, J. (2026). Verifiable Invoice Commitment: An EVM-Native Standard for Committing Fiscal Metadata to On-Chain Payments.** SSRN.
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6795482
+
 ## What this is
 
 VIC is a proposed Ethereum standard that lets a commercial invoice — with
@@ -181,7 +188,7 @@ VIC composes with, and does not replace, existing standards:
 | Posted to Ethereum Magicians for discussion                  | ✓ Done      |
 | PR submitted to `ethereum/ERCs`                               | Pending     |
 | Reference deployment on Sepolia / Base Sepolia / Arbitrum    | ✓ Done      |
-| Preprint on SSRN                                             | Pending     |
+| Preprint on SSRN                                             | ✓ Done      |
 | ERC-7730 descriptor submitted to Ledger registry             | Pending     |
 | EIP advances to `Review`                                     | Pending     |
 | Mainnet canonical deployments                                | Pending     |
@@ -194,7 +201,7 @@ belong in this repository's Issues.
 
 ## Citing VIC
 
-If you use VIC in academic work, please cite the preprint (when available):
+If you use VIC in academic work, please cite the preprint:
 
 ```bibtex
 @misc{mateos2026vic,
@@ -203,6 +210,7 @@ If you use VIC in academic work, please cite the preprint (when available):
                   for Committing Fiscal Metadata to On-Chain Payments},
   year         = {2026},
   howpublished = {SSRN preprint},
+  url          = {https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6795482},
   note         = {Also published as ERC-XXXX (Draft).
                   ORCID: 0009-0003-0596-1708.}
 }
