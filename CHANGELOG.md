@@ -12,6 +12,11 @@ will move to `1.0.0` and breaking-change rules apply.
 
 ## [Unreleased]
 
+### Added
+
+- SSRN preprint published with abstract ID 6795482; README updated with link and
+  BibTeX entry. URL: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6795482
+
 ### Announced
 
 - 2026-05-13: Published on Ethereum Magicians for community discussion.
@@ -23,7 +28,6 @@ will move to `1.0.0` and breaking-change rules apply.
 - ERC-7730 descriptor submitted to the LedgerHQ clear-signing registry.
 - Companion EIP drafts for jurisdictional `regulatoryData` schemas (AR, MX, IT).
 - Pull request opened against `ethereum/ERCs`.
-- Preprint published on SSRN.
 
 ## [0.1.0-draft] — 2026-05-13
 
