@@ -98,7 +98,7 @@ async function main() {
   console.log(`Network:          chain ${chainId} (Arbitrum Sepolia)`);
   console.log(`Registry:         ${REGISTRY_ADDRESS}`);
 
-  const issuerWallet = new Wallet(PRIVATE_KEY, provider);
+  const issuerWallet = new Wallet(PRIVATE_KEY!, provider);
   console.log(`Issuer wallet:    ${issuerWallet.address}`);
 
   const issuerBalance = await provider.getBalance(issuerWallet.address);
@@ -198,7 +198,7 @@ async function main() {
 
   // ── Step 4: Sign with EIP-712 ──
   console.log("\n[4] Signing invoice with EIP-712...");
-  const issuer = new InvoiceIssuer(issuerWallet, REGISTRY_ADDRESS, chainId);
+  const issuer = new InvoiceIssuer(issuerWallet, REGISTRY_ADDRESS!, chainId);
   const signed = await issuer.signInvoice(invoice);
   console.log(`    Invoice hash: ${signed.invoiceHash}`);
   console.log(`    Signature:    ${signed.signature.slice(0, 22)}...`);
@@ -207,7 +207,7 @@ async function main() {
   console.log("\n[5] Verifying off-chain hash matches on-chain hash...");
   const agree = await verifyHashAgreement(
     provider,
-    REGISTRY_ADDRESS,
+    REGISTRY_ADDRESS!,
     invoice,
     signed.invoiceHash,
   );
@@ -246,7 +246,7 @@ async function main() {
 
   // ── Step 8: Full verification ──
   console.log("\n[8] Recipient-side verification (full 4-property check)...");
-  const recipient = new InvoiceRecipient(REGISTRY_ADDRESS, chainId);
+  const recipient = new InvoiceRecipient(REGISTRY_ADDRESS!, chainId);
   const result = await recipient.verify(
     provider,
     signed.json,
@@ -302,7 +302,7 @@ async function main() {
       name: "Arbitrum Sepolia",
       rpc: RPC_URL,
     },
-    registrar: REGISTRY_ADDRESS,
+    registrar: REGISTRY_ADDRESS!,
     invoice_hash: signed.invoiceHash,
     payment_tx_ref: paymentReceipt!.hash,
     transactions: {
@@ -358,7 +358,7 @@ async function main() {
         schema_id: "vic.invoice.v1",
         invoice_hash: signed.invoiceHash,
         chain_id: Number(chainId),
-        registrar: REGISTRY_ADDRESS,
+        registrar: REGISTRY_ADDRESS!,
         payment_tx_ref: paymentReceipt!.hash,
       },
     },
@@ -372,7 +372,7 @@ async function main() {
   // 9.4: README.md
   const readme = generateReadme({
     chainId: Number(chainId),
-    registrar: REGISTRY_ADDRESS,
+    registrar: REGISTRY_ADDRESS!,
     invoiceHash: signed.invoiceHash,
     paymentTxRef: paymentReceipt!.hash,
     commitTxHash: commitResult.txHash,
