@@ -1,0 +1,52 @@
+{
+  "description": "VIC Invoice signed by issuer with EIP-712, committed on Arbitrum Sepolia. The nonce field is shown as the value that was actually used in the on-chain commitment (visible in the InvoiceCommitted event log).",
+  "invoice": {
+    "invoiceId": "FC-A-0001-SAR-FIXTURE-001",
+    "issueDate": "1781967600",
+    "dueDate": "1784559600",
+    "paymentTerms": "Net 30",
+    "purchaseOrderRef": "",
+    "issuer": "0xD096D1326Cd60bd322ce8A2F7d462735Bf65Ba13",
+    "issuerTaxId": {
+      "scheme": "AR-CUIT",
+      "id": "30-12345678-9"
+    },
+    "recipient": "0xef58a240401d47de0CbeCCAFf814f90d65b30Ea0",
+    "recipientTaxId": {
+      "scheme": "MX-RFC",
+      "id": "CLIX850101AB1"
+    },
+    "paymentToken": "0x3Af7F644A147F75004E022a8623bf14FEb9AFf6d",
+    "paymentAmount": "1210000000",
+    "fiatCurrency": "USD",
+    "fiatAmountMilliUnits": "1210000",
+    "fxRateScaled": "100000000",
+    "fxOracle": "0x0000000000000000000000000000000000000000",
+    "fxTimestamp": "1781967600",
+    "taxes": [
+      {
+        "taxType": "IVA",
+        "taxScheme": "AR-IVA-21",
+        "rateBps": "2100",
+        "baseAmountMilliUnits": "1000000",
+        "taxAmountMilliUnits": "210000"
+      }
+    ],
+    "lineItems": [
+      {
+        "description": "Agentic commerce consulting (SAR/VIC composition fixture)",
+        "quantityScaled": "1000",
+        "unit": "EA",
+        "unitPriceMilliUnits": "1000000",
+        "lineTotalMilliUnits": "1000000",
+        "taxRefIndex": "0"
+      }
+    ],
+    "jurisdiction": "AR",
+    "regulatoryData": "0x",
+    "nonce": "RECONSTRUCTED_FROM_EVENT_LOG"
+  },
+  "signature": "0x39a14f45fece215e5698b59a0459dfa03b3ea76e6cf4ed2459471ab544fc52e40a49ddabdfb95a9f89135143092684b8caea553cb357904d212879531ad734b71c",
+  "invoiceHash": "0xad9cfdcbd843098786ad0f84068c8810246706e1ffaa1969bba83948352dea2c",
+  "note": "To recover the exact nonce, decode the InvoiceCommitted event from the commit tx."
+}

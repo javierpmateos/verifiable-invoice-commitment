@@ -23,3 +23,17 @@ contracts/lib/
 
 # OS
 .DS_Store
+
+# LaTeX intermediate outputs
+docs/paper.aux
+docs/paper.out
+docs/paper.pdf
+*.aux
+*.out
+*.toc
+
+# Local zip exports
+vic-paper.zip
+
+# SAR CLI reports (defaultsettle local outputs)
+reports/

@@ -76,7 +76,9 @@ export class InvoiceRecipient {
       provider,
     );
     const filter = registry.filters.InvoiceCommitted(onChainInvoiceHash);
-    const events = await registry.queryFilter(filter, 0, "latest");
+    const latestBlock = await provider.getBlockNumber();
+    const fromBlock = Math.max(0, latestBlock - 45000);
+    const events = await registry.queryFilter(filter, fromBlock, "latest");
     if (events.length === 0) {
       errors.push("No InvoiceCommitted event found for the given hash");
     } else {
