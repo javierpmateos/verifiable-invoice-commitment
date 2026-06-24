@@ -89,12 +89,22 @@ cast call 0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD \
   --rpc-url https://sepolia-rollup.arbitrum.io/rpc
 ```
 
-## Reproducing the SAR side
+## SAR-side composition
 
-The composed SAR receipt with `_ext.invoice` referencing this commitment will be hosted in
-[`sar-sdk` fixtures](https://github.com/xmandate-ai/sar-sdk) once produced by the SAR side.
+The composed SAR receipt with `_ext.invoice` referencing this commitment is published at:
 
-A reference SAR receipt can be generated locally with:
+- [`defaultsettlement-sdk/packages/sar-402/examples/vic-sar-composition`](https://github.com/nutstrut/defaultsettlement-sdk/tree/main/packages/sar-402/examples/vic-sar-composition)
+
+That fixture contains:
+
+- `receipt-with-vic-ext.json` — a SAR-402 receipt embedding the `_ext.invoice` payload from this directory.
+- `ext-invoice.json` — the same payload, copied verbatim from this fixture.
+- `commitment-data.json` — the upstream VIC commitment data, included for replayability.
+- `README.md` — the SAR-side documentation including the cross-layer verification flow.
+
+Together with this directory, the two fixtures form the cross-layer audit pair agreed in [x402 issue #1195](https://github.com/x402-foundation/x402/issues/1195).
+
+A reference SAR receipt can also be generated locally with:
 
 ```bash
 pipx install git+https://github.com/nutstrut/defaultsettle-cli.git

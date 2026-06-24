@@ -176,6 +176,9 @@ VIC composes with, and does not replace, existing standards:
 | **ERC-4337**  | Commitment + payment MAY be bundled in one `UserOperation`.   |
 | **ERC-7943**  | Commitment MAY be invoked from `canTransfer` hooks for RWAs.  |
 | **MPP**       | The `invoiceHash` MAY appear in MPP `Payment-Receipt` headers. |
+| **SAR**       | The VIC commitment MAY be referenced from a SAR receipt's `_ext.invoice` envelope. See [composition fixture](fixtures/sar-composition/). |
+
+A concrete composition fixture (VIC + SAR cross-layer audit pair) is published in [`fixtures/sar-composition/`](fixtures/sar-composition/), with the SAR-side fixture hosted in [`nutstrut/defaultsettlement-sdk`](https://github.com/nutstrut/defaultsettlement-sdk/tree/main/packages/sar-402/examples/vic-sar-composition). Composition discussion: [x402 issue #1195](https://github.com/x402-foundation/x402/issues/1195).
 
 ## Status
 
