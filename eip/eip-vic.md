@@ -1,7 +1,6 @@
 ---
-eip: XXXX
 title: Verifiable Invoice Commitment (VIC)
-description: A standard for committing structured, EIP-712-signed invoice metadata to on-chain payments via a deterministic singleton registrar.
+description: Commits structured, EIP-712-signed invoice metadata to on-chain payments via a deterministic singleton registrar.
 author: Javier Mateos (@javierpmateos)
 discussions-to: https://ethereum-magicians.org/t/erc-verifiable-invoice-commitment-vic-fiscal-metadata-anchored-to-on-chain-payments-via-eip-712-singleton-registrar/28547
 status: Draft
@@ -31,7 +30,7 @@ The Verifiable Invoice Commitment standard fills the remaining gap by defining a
 
 ## Specification
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119 and RFC 8174.
 
 ### 1. EIP-712 Typed Data Schema
 
@@ -244,7 +243,6 @@ A reference implementation of the registrar, EIP-712 signing utilities, an ERC-7
 
 **Tax calculation integrity.** The structural invariant is a data-integrity check. It does not validate legal correctness of tax rates or classifications.
 
-## Privacy Considerations
 
 **On-chain observability.** The commitment event publicly discloses `issuer`, `recipient`, and `paymentTxRef`. Counterparty privacy techniques (stealth addresses per [ERC-5564](./erc-5564.md), privacy pools) operate orthogonally.
 
