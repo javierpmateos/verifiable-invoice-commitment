@@ -154,12 +154,14 @@ address on every EVM chain.
 | Sepolia   | 11155111 | `0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD` | Live (verified) |
 | Base Sepolia | 84532 | `0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD` | Live (verified) |
 | Arbitrum Sepolia | 421614 | `0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD` | Live (verified) |
+| Avalanche Fuji | 43113 | `0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD` | Live (verified) |
 
 Testnet contracts are verified and source code is publicly auditable:
 
 - [Sepolia (Etherscan)](https://sepolia.etherscan.io/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code)
 - [Base Sepolia (Basescan)](https://sepolia.basescan.org/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code)
 - [Arbitrum Sepolia (Arbiscan)](https://sepolia.arbiscan.io/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code)
+- [Avalanche Fuji (Snowtrace)](https://testnet.snowtrace.io/address/0xa8C5b7D5B413297343ca6CeCe3931F9770D7A2FD#code)
 
 Mainnet deployments are deferred until the EIP reaches `Last Call`.
 
