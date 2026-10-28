@@ -99,6 +99,7 @@ contract InvoiceCommitmentRegistryTest is Test {
         InvoiceCommitmentTypes.Invoice memory inv = _buildInvoice(1);
         (bytes memory sig, bytes32 digest) = _sign(inv);
 
+        vm.prank(issuer);
         bytes32 returnedHash = registry.commitInvoice(
             inv,
             bytes32(uint256(0xDEAD)),
@@ -124,6 +125,7 @@ contract InvoiceCommitmentRegistryTest is Test {
 
         bytes memory ciphertext = hex"DEADBEEF1234";
 
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -136,11 +138,11 @@ contract InvoiceCommitmentRegistryTest is Test {
         assertTrue(registry.isNonceUsed(issuer, 2));
     }
 
-    function test_CommitCallableByThirdParty() public {
+    function test_CommitCallableByRecipient() public {
         InvoiceCommitmentTypes.Invoice memory inv = _buildInvoice(3);
         (bytes memory sig, ) = _sign(inv);
 
-        vm.prank(randomUser);
+        vm.prank(recipient);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -151,6 +153,44 @@ contract InvoiceCommitmentRegistryTest is Test {
         );
 
         assertTrue(registry.isNonceUsed(issuer, 3));
+    }
+
+    /// A third party holding a signed invoice cannot commit it with a payment
+    /// reference of its choosing, and so cannot spend the issuer's nonce.
+    function test_RevertsIfCallerIsNeitherIssuerNorRecipient() public {
+        InvoiceCommitmentTypes.Invoice memory inv = _buildInvoice(8);
+        (bytes memory sig, bytes32 digest) = _sign(inv);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvoiceCommitmentRegistry.UnauthorizedCaller.selector,
+                randomUser
+            )
+        );
+        vm.prank(randomUser);
+        registry.commitInvoice(
+            inv,
+            bytes32(uint256(0xBAD)),
+            InvoiceCommitmentTypes.PayloadMode.OffChain,
+            "ipfs://not-the-issuer",
+            "",
+            sig
+        );
+
+        assertFalse(registry.isNonceUsed(issuer, 8));
+
+        vm.prank(issuer);
+        registry.commitInvoice(
+            inv,
+            bytes32(uint256(0xDEAD)),
+            InvoiceCommitmentTypes.PayloadMode.OffChain,
+            "",
+            "",
+            sig
+        );
+
+        (, , bytes32 storedTxRef) = registry.getCommitment(digest);
+        assertEq(storedTxRef, bytes32(uint256(0xDEAD)));
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -164,6 +204,7 @@ contract InvoiceCommitmentRegistryTest is Test {
         bytes memory badSig = abi.encodePacked(r, s, v);
 
         vm.expectRevert(InvoiceCommitmentRegistry.InvalidSignature.selector);
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -178,6 +219,7 @@ contract InvoiceCommitmentRegistryTest is Test {
         InvoiceCommitmentTypes.Invoice memory inv = _buildInvoice(5);
         (bytes memory sig, ) = _sign(inv);
 
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -194,6 +236,7 @@ contract InvoiceCommitmentRegistryTest is Test {
                 5
             )
         );
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -209,6 +252,7 @@ contract InvoiceCommitmentRegistryTest is Test {
         (bytes memory sig, ) = _sign(inv);
 
         vm.expectRevert(InvoiceCommitmentRegistry.EncryptedPayloadRequired.selector);
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -224,6 +268,7 @@ contract InvoiceCommitmentRegistryTest is Test {
         (bytes memory sig, ) = _sign(inv);
 
         vm.expectRevert(InvoiceCommitmentRegistry.EncryptedPayloadForbidden.selector);
+        vm.prank(issuer);
         registry.commitInvoice(
             inv,
             bytes32(0),
@@ -241,12 +286,14 @@ contract InvoiceCommitmentRegistryTest is Test {
         (bytes memory sig1, ) = _sign(inv1);
         (bytes memory sig2, ) = _sign(inv2);
 
+        vm.prank(issuer);
         registry.commitInvoice(
             inv1,
             bytes32(0),
             InvoiceCommitmentTypes.PayloadMode.OffChain,
             "", "", sig1
         );
+        vm.prank(issuer);
         registry.commitInvoice(
             inv2,
             bytes32(0),
